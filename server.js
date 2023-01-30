@@ -1,5 +1,6 @@
 const express = require('express')
 const bodyParser = require('body-parser');
+const bcrypt = require('bcrypt');
 const MongoClient = require('mongodb').MongoClient;
 
 const dburi = "mongodb+srv://adl-2:123456654321@cluster0.dcpowex.mongodb.net/test";
@@ -14,6 +15,14 @@ app.listen(port, () => console.log(`Server listening on port ${port}!`))
 
 
 //endpoits (APIs)
+app.post('/signup',async (req,res)=>{
+
+    const {name,pwd} = req.body;
+    const response = await Register_User(name,pwd);
+    res.send(response);
+
+})
+
 app.post('/login',async (req, res) => {
     const { username, password } = req.body;
      const dbrespons = await Authenticate (username,password);
@@ -38,15 +47,46 @@ app.get('/my_notes',async (req,res) =>{
     res.send(response);
 })
 
+
+
 //functions
+async function Register_User(name,pwd){
+    
+        bcrypt.genSalt(5, async function(err, salt) {
+        bcrypt.hash(pwd, salt, async function(err, hash) {
+            
+            await client.connect()
+            const db =  client.db('Playground');
+            const Users = db.collection('Users');
+            const data = {name:name,pwd:hash}           // bcrypt.compare(pwd, hash, function(err, result) {console.log(result)});
+            console.log(data);
+            await Users.insertOne(data)
+            client.close();
+            
+
+        });
+    });
+
+    return true;
+}
 async function Authenticate(name,pwd){
    
+    let status = "none";
     await client.connect()
     const db =  client.db('Playground');
     const Users = db.collection('Users');
     
-    const findResult = await Users.find({name:name,pwd:pwd},{projection:{_id:0}}).toArray();
-    if(findResult.length==0)    {return {login:false}}    else{ return {login:true}}
+    const findResult = await Users.find({name:name},).toArray();
+    if(findResult.length==0)    {return {Status:"No Match Found"}}    
+    else{ 
+        bcrypt.compare(pwd, findResult[0].pwd, function(err, result)
+         {
+            console.log(findResult[0].pwd+"   "+result+ "  "+pwd )
+            if(result){status="Login Sucess"}
+                
+        });
+        return {Status:status}
+    }
     
 }
 async function Post_New_Note(user,note){
